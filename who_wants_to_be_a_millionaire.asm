@@ -5,16 +5,22 @@ org 100h
 	pwd1	db "naruto123"
 	usrlen1	dw 8
 	pwdlen1	dw 9
+	score_1 dw 0
 	
 	usr2	db "yasseen"
 	pwd2	db "furiousfarooq"
 	usrlen2	dw 7
 	pwdlen2	dw 13
+	score_2 dw 1
 	
 	usr3	db "kathem"
 	pwd3	db "layla"
 	usrlen3	dw 6
 	pwdlen3	dw 5
+	score_3 dw 3
+	
+	scoreboard dw score_1, score_2, score_3
+	users dw usr1, usr2, usr3
 	
 	welcome_msg1 db 13, 10, 13, 10, "   Welcome to this episode of "
 				 db "$"
@@ -40,29 +46,87 @@ org 100h
 	
 	invalid_char db "   Invalid Character. Try again.", 13, 10, "$"
 	
+	q0 db "   How many Arab countries have the official currency of Riyal?", 13, 10
+		db "   A: Two   B: Four   C: Three   D: Five"
+		db "$"
+		
+	ans0 db "b"
+	
+	q1 db "   What do you call someone who exaggerates his traits and finds himself of all humans supreme?", 13, 10
+		db "   A: Humble   B: Egotistical   C: Generous   D: Honourable"
+		db "$"
+	
+	ans1 db "b"
+	
+	
+	q2 db "   What is the plural of 'Fish'?", 13, 10
+		db "   A: Fish   B: Fishies   C: Parliament of Fish   D: Fish's"
+		db "$"
+		
+	ans2 db "a"
+		
+	q3 db "   Continue: 'Find wisdom in the words of ____?", 13, 10
+		db "   A: Barbers   B: Artists   C: Astrologers   D: The Mad"
+		db "$"
+	
+	ans3 db "d"
+		
+	q4 db "   Your father is her grandpa, and your brother is her uncle. You're her mother's husband. Who is she?", 13, 10
+		db "   A: Your Aunt   B: Your Mother   C: Your Daughter   D: Your Sister"
+		db "$"
+
+	ans4 db "c"
+	
+	correct_ans_msg db 13, 10, "   Correct!$"
+	
+	wrong_ans_msg db 13, 10, "   Incorrect!$"
+	
+	congrats_msg db 13, 10, "   Congrats! You now have 1000 Saudi Riyals.$"
+	
+	results_msg_0 db 13, 10, "   You scored "
+				db "$"
+				
+	results_msg_1 db "/5 in this quiz.", 13, 10
+				db "$"
+	
+	restart_msg db "   Play again? (Y/n)$"
+	
+	end_game_msg db 13, 10, "   Thanks for playing!$"
+	
+	continue_msg db 13, 10, "   Continue to scoreboard? (Y/n)$"
+	
 	usr_to_check db 0
 	access_limit db 3
+	correct_count db 0
+	seed dw 0
+	
+	question_table dw question0, question1, question2, question3, question4
+	
+	
 .code
 	jmp start
 	
 	clear_terminal proc
-		mov ah, 06h        ; Scroll up function
-		mov al, 0          ; Scroll 0 lines → clear entire area
-		mov bh, 07h        ; Text attribute (white on black)
-		mov cx, 0      ; Top-left corner: row 0, col 0
-		mov dx, 184Fh      ; Bottom-right: row 24, col 79 (25x80 screen)
+		mov ah, 06h        ;scroll up function
+		mov al, 0          ;scroll 0 lines to clear entire area
+		mov bh, 07h
+		push cx
+		mov cx, 0
+		mov dx, 184Fh
 		int 10h
+		
+		pop cx
 
 		ret
 	clear_terminal endp
 	
 	zero_cursor proc
-		mov ah, 2     ; Set cursor position
-		mov dh, 0       ; Row = 0
-		mov dl, 0       ; Column = 0
+		mov ah, 2     ;set cursor
+		mov dh, 0     ;row = 0
+		mov dl, 0     ;column = 0
 		int 10h
 		
-		mov dl, ' '  ; print a space
+		mov dl, ' '
 		int 21h
 		
 		mov ah, 02h
@@ -122,7 +186,7 @@ org 100h
 			call clear_terminal
 			call zero_cursor
 			mov ah, 09h
-			lea dx, check_fail_msg ; print sign-in message.
+			lea dx, check_fail_msg
 			int 21h
 			call usr_sign_in
 			call clear_terminal
@@ -187,13 +251,13 @@ org 100h
 			jmp welcome2_next_char
 
 		welcome3:
-			inc dh 			; reset the cursor.
+			inc dh 			
 			mov dl, 0
 			mov ah, 02h
 			mov bh, 0
 			int 10h
 			
-			mov ah, 09h		; type new message with default settings.
+			mov ah, 09h		;type new message with default settings.
 			lea dx, welcome_msg3
 			int 21h
 		
@@ -218,7 +282,7 @@ org 100h
 		cmp access_limit, 0
 		jz bad_access
 		mov ah, 09h
-		lea dx, sign_in_msg ; print sign-in message.
+		lea dx, sign_in_msg ;print sign-in message.
 		int 21h
 		
 		mov ah, 0Ah
@@ -315,33 +379,26 @@ org 100h
 			call clear_terminal
 			call zero_cursor
 			mov ah, 09h
-			lea dx, check_fail_msg ; print sign-in message.
+			lea dx, check_fail_msg
 			int 21h
 			call usr_sign_in
 			ret
 	authenticate_usr_plus endp
 	
 	timer proc
-		; Input: AL = number of seconds
-		; Output: AL = key pressed if any, else 0
-	
-		push ax
-		push bx
-		push cx
-		push dx
+		;al is the number of seconds.
 		push si
 
-		mov bl, al         ; BL = countdown number
-		mov si, 1          ; SI = first_time flag
+		mov bl, al         
+		mov si, 1          
 
-		call clear_line    ; Optional: move to a new line
+		call clear_line
 
 		count_loop:
-			; Erase previous number (not first time)
+			
 			cmp si, 1
 			je skip_erase
 
-			; backspace + space + backspace to erase digit
 			mov dl, 8
 			mov ah, 02h
 			int 21h
@@ -351,28 +408,29 @@ org 100h
 			int 21h
 
 		skip_erase:
-			mov si, 0          ; next time we erase
+			mov si, 0        
 
-			; Check for keypress
 			mov ah, 01h
 			int 16h
 			jnz key_pressed
 
-			; Convert BL to ASCII and print it
 			mov al, bl
 			add al, '0'
 			mov dl, al
 			mov ah, 02h
 			int 21h
 
-			; Wait ~1 second
 			mov ah, 00h
+			push cx
 			int 1Ah
+			pop cx
 			mov si, dx
 
 		wait_tick:
 			mov ah, 00h
+			push cx
 			int 1Ah
+			pop cx
 			sub dx, si
 			cmp dx, 18
 			jb wait_tick
@@ -381,21 +439,15 @@ org 100h
 			cmp bl, 0
 			jne count_loop
 
-			; Time expired
-			mov al, 0
+			mov al, 'g'
 			jmp done
 
 		key_pressed:
 			mov ah, 00h
 			int 16h
-			; AL now holds key
 
 		done:
 			pop si
-			pop dx
-			pop cx
-			pop bx
-			pop ax
 			ret
 
 		clear_line:
@@ -415,7 +467,6 @@ org 100h
 	lower proc
 		cmp al, 97
 		jae accept_input
-		;jbe to_lower
 		
 		add al, 32
 		
@@ -429,9 +480,6 @@ org 100h
 		jmp valid
 		
 		invalid:
-			;mov ah, 09h
-			;lea dx, invalid_char
-			;int 21h
 			mov ah, 01h
 			int 21h
 			call lower
@@ -441,6 +489,313 @@ org 100h
 		
 	lower endp
 	
+	quiz_start proc
+		mov cx, 5          ;# of q's.
+		mov si, seed
+		;shl si, 1
+		ask_loop:
+			mov bx, offset return_addr_quiz
+			push bx
+			call clear_terminal
+			call zero_cursor
+			
+			mov bx, offset question_table
+			jmp [bx + si]
+			
+			return_addr_quiz:
+
+			inc si
+			inc si
+			cmp si, 10
+			jb skip_wrap
+			mov si, 0
+
+		skip_wrap:
+			loop ask_loop
+		
+		ret
+	quiz_start endp
+	
+	question0 proc
+		mov ah, 09h
+		lea dx, q0
+		int 21h
+		
+		mov al, 8
+		call timer
+		
+		validation_0:
+		call lower
+		
+		cmp al, ans0
+		je correct_0
+		jmp incorrect_0
+		
+		incorrect_0:
+			mov ah, 09h
+			lea dx, wrong_ans_msg
+			int 21h
+			
+			call wrong_beep
+			
+			ret
+			
+		correct_0:
+			mov ah, 09h
+			lea dx, correct_ans_msg
+			int 21h
+			
+			inc correct_count
+			
+			ret
+	question0 endp
+	
+	question1 proc
+	
+		mov ah, 09h
+		lea dx, q1
+		int 21h
+		
+		mov al, 8
+		call timer
+		
+		validation_1:
+		call lower
+		
+		cmp al, ans1
+		je correct_1
+		jmp incorrect_1
+		
+		incorrect_1:
+			mov ah, 09h
+			lea dx, wrong_ans_msg
+			int 21h
+			
+			call wrong_beep
+			
+			ret
+			
+		correct_1:
+			mov ah, 09h
+			lea dx, correct_ans_msg
+			int 21h
+			
+			inc correct_count
+			
+			ret
+	
+	question1 endp
+	
+	question2 proc
+	
+		mov ah, 09h
+		lea dx, q2
+		int 21h
+		
+		mov al, 8
+		call timer
+		
+		validation_2:
+		call lower
+		
+		cmp al, ans2
+		je correct_2
+		jmp incorrect_2
+		
+		incorrect_2:
+			mov ah, 09h
+			lea dx, wrong_ans_msg
+			int 21h
+			
+			call wrong_beep
+			
+			ret
+			
+		correct_2:
+			mov ah, 09h
+			lea dx, correct_ans_msg
+			int 21h
+			
+			inc correct_count
+			ret
+	
+	question2 endp
+	
+	question3 proc
+	
+		mov ah, 09h
+		lea dx, q3
+		int 21h
+		
+		mov al, 8
+		call timer
+		
+		validation_3:
+		call lower
+		
+		cmp al, ans3
+		je correct_3
+		jmp incorrect_3
+		
+		incorrect_3:
+			mov ah, 09h
+			lea dx, wrong_ans_msg
+			int 21h
+			
+			call wrong_beep
+			
+			ret
+			
+		correct_3:
+			mov ah, 09h
+			lea dx, correct_ans_msg
+			int 21h
+			
+			inc correct_count
+			
+			ret
+	
+	question3 endp
+	
+	question4 proc
+	
+		mov ah, 09h
+		lea dx, q4
+		int 21h
+		
+		mov al, 8
+		call timer
+		
+		validation_4:
+		call lower
+		
+		cmp al, ans4
+		je correct_4
+		jmp incorrect_4
+		
+		incorrect_4:
+			mov ah, 09h
+			lea dx, wrong_ans_msg
+			int 21h
+			
+			call wrong_beep
+			
+			ret
+			
+		correct_4:
+			mov ah, 09h
+			lea dx, correct_ans_msg
+			int 21h
+			
+			inc correct_count
+			
+			ret
+	
+	question4 endp
+	
+	results proc
+		mov ah, 09h
+		lea dx, results_msg_0
+		int 21h
+		
+		mov dl, correct_count
+		add dl, 48
+		mov ah, 02h
+		int 21h
+		
+		mov ah, 09h
+		lea dx, results_msg_1
+		int 21h
+		
+		cmp correct_count, 5
+		jne end_results
+		
+		lea dx, congrats_msg
+		int 21h
+		
+		end_results:
+			lea dx, continue_msg
+			int 21h
+			
+			mov ah, 01h
+			int 21h
+			
+			cmp al, 'y'
+			je continuing
+			cmp al, 'n'
+			je not_continuing
+			
+			
+			continuing:
+				call scoreboarding
+				
+			not_continuing:
+			mov ah, 09h
+			lea dx, restart_msg
+			int 21h
+			ret
+	results endp
+	
+	scoreboarding proc
+		call clear_terminal
+		call zero_cursor
+		
+		call adjust_scores
+		call print_scoreboard
+		
+		ret
+	scoreboarding endp
+	
+	adjust_scores proc
+		mov bx, offset scoreboard
+		and dx, 0
+		mov dl, usr_to_check
+		dec dl
+		shl dl, 1
+		mov si, dx
+		
+		mov bx, [bx + si]
+		
+		mov dl, correct_count
+		
+		cmp dx, [bx]
+		ja change_high_score
+		
+		ret
+		
+		change_high_score:
+			mov dl, correct_count
+			mov [bx + si], dx
+			
+			ret
+	adjust_scores endp
+	
+	print_scoreboard proc
+		ret
+		
+	print_scoreboard endp
+	
+	end_game proc
+		call clear_terminal
+		call zero_cursor
+		
+		mov ah, 09h
+		lea dx, end_game_msg
+		int 21h
+		
+		mov ah, 4Ch
+		int 21h
+		
+	end_game endp
+	
+	wrong_beep proc
+		mov ah, 02h
+		mov dl, 7
+		int 21h
+		int 21h
+		ret
+	wrong_beep endp
+	
 	start:
 		mov ax, 0700h
 		mov ds, ax    
@@ -448,32 +803,56 @@ org 100h
 		mov ax, 2000h
 		mov es, ax
 		
-		call usr_sign_in
-		call clear_terminal
-		call zero_cursor
-		call pwd_sign_in
-		call welcome
-		mov dl, 13
-		mov ah, 02h
-		int 21h
-		mov dl, 10
-		int 21h
-		mov dl, 32
-		int 21h
-		int 21h
-		int 21h
-		mov ah, 01h
-		int 21h
-		
-		call lower
-		call terminate_access
-		
-		;mov al, 5	; # of seconds (works up to 9).
-		;call timer
-		
+		restart:
+			mov correct_count, 0
+			call clear_terminal
+			call zero_cursor
+			call usr_sign_in
+			call clear_terminal
+			call zero_cursor
+			call pwd_sign_in
+			mov access_limit, 3
+			call welcome
+			mov dl, 13
+			mov ah, 02h
+			int 21h
+			mov dl, 10
+			int 21h
+			mov dl, 32
+			int 21h
+			int 21h
+			int 21h
+
+			validation_start:
+			mov ah, 01h
+			int 21h
+			call lower
+			
+			cmp al, 'y'
+			je start_quiz
+			cmp al, 'n'
+			je terminate_program
+			
+			jmp validation_start
+			
+			start_quiz:
+				call clear_terminal
+				call zero_cursor
+				call quiz_start
+				call results
+				
+				mov ah, 01h
+				int 21h
+				call lower
+				
+				cmp al, 'y'
+				je restart
+				cmp al, 'n'
+				je terminate_program
+				
+				jmp restart
+				
+			terminate_program:
+				call end_game
 	
 	end start
-	
-	;mov ah, 01h
-	;int 21h
-	; result is in AL
